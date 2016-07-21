@@ -1,0 +1,88 @@
+//  hierarchical Q learning
+666903          // random number seed for agent
+                // Note that there are typically two random number
+                // generators in any application.  First, the State
+                // for the problem has an RNG, which is used to
+                // generate the randomness in state transitions, etc.
+                // This generator is defined in state.h, and it is
+                // initialized by the "-s" command line argument to hq-agent.
+                // Second, an RNG is needed for randomized
+                // exploration.  This is a global variable defined in hq-agent.
+                // It is initialized by the value shown here.
+
+///////////learning controls///////////////
+0               // perform Prioritized Sweeping? (keep at zero; a Dead Feature)
+1.00            // learning rate: 
+// list of (trial maxnode lrate) to change learning rates
+( )
+0               // steps of psweep per real step
+
+///////////exploration controls//////////////////
+0               // 0 => Boltzmann exploration 1 => epsilonGreedy  2 => counters
+50.0            // global initial temperature (Boltzmann)
+                // or initial epsilon (Epsilon greedy)
+                // or required number of visits (counter-based exploration)
+0.95            // global cooling rate (Boltzmann)
+                // or amount to decrease epsilon (Epsilon greedy)
+                // Not used in counter-based exploration.
+0               // global minimum temperature (Boltzmann)
+                // minimum epsilon (Epsilon Greedy)
+                // Not used in counter-based.
+// list of (MaxNode-name initial-temp coolingrate mintemp) to
+// separately specify exploration for individual nodes
+(
+MaxRoot 50.0 0.9074 0.0
+MaxPut  50.0 0.9526 0.0
+MaxGet  50.0 0.9526 0.0
+MaxNavigate 50.0 0.9879 0.0
+)
+// list of max nodes to execute the hand-coded policy rather than the
+// learned policy
+( )  
+
+///////////////other stuff//////////////////////
+1.0             // discount factor (Dead Feature)
+0               // hand-coded policy probability (Dead Feature)
+0               // VERBOSE
+0               // LEARNVERBOSE
+1000            // maxStepsPerEvalTrial.  If we are doing 
+                // evaluation trials (as controlled by the -i argument
+                // to hq-agent), this determines the maximum number of
+                // steps in an evaluation trial
+1000            // stepsPerEvalCall.  If we are doing evaluation
+                // trials, this determines whether they are performed
+                // by hierarchical execution (call and return) or by
+                // hierarchical greedy execution.  Set to 1 for
+                // hierarchical greedy execution
+// list of max nodes to monitor in log file
+( )  
+// list of max nodes on which to perform value iteration (Dead Feature)
+( )
+
+///////////////selective learning controls//////////
+// (Dead Features) I'm not currently using these, so I've set them to always update
+// and cool
+100             // ABEspan
+9999.0          // deltaBellmanThreshold (max tildeBellmanError per
+                // step for a max node in order to cool)
+9999.0          // update Threshold (max moving average
+                // tildeBellmanError of child in order to learn)
+
+/////////////methods for introducing hierarchical greedy execution////
+0.0             // interrupt probability (Dead Feature)
+99999           // pollingCoolingRate; reduce RootQuota every N trials
+                // Each time MaxRoot is executed, it is given a
+                // RootQuota: a number of primitive actions it is
+                // allowed to execute before it is interrupted.  The
+                // initial value is equal to maxStepsPerTrial (see
+                // below).  Every pollingCoolingRate trials, the
+                // RootQuota will be reduced by the amount specified
+                // by pollingCoolingStep.
+0               // pollingCoolingStep; amount to reduce RootQuota
+                // in ValueIteration = number of times to execute each
+                // action during value measurement.
+5000            // maxStepsPerTrial
+
+////////////unsupported controls/////////////////////
+0               // discriminate (not supported) (Dead Feature)
+0.0             // lambda (not supported) (Dead Feature)

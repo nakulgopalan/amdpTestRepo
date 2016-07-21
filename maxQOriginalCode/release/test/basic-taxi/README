@@ -1,0 +1,21 @@
+This is the simplest taxi domain.  No fuel, all actions deterministic.
+
+We employ a learning rate of 1 in all of these scripts.
+
+flat-hand-coded.script:  run with hand-coded policy.  This should be the
+                    optimal policy.
+                    
+flat.script:        flat Q learning
+
+h-hand-coded.script  run hand-coded hierarchical policy.
+
+h-q.script:         hierarchical Q learning
+
+plot.gp             command file for gnuplot to compare the four methods
+
+To recreate these experiments, go to the release directory and do a
+clean make of hq-agent and fq-agent and move the executables here.
+Then execute each of the scripts.
+
+Note that rerunning the scripts will clobber the sub-ma-200 files, so
+if you want to make a comparison, you should rename those files first.

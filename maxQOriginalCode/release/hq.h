@@ -1,0 +1,607 @@
+//  -*- c++ -*-
+//
+//
+
+
+#ifndef HQ_H
+#define HQ_H
+
+#include "get-state.h"
+#include "state.h"
+#include "parameter.h"
+#include "predicate.h"
+#include "snet.h"
+#include "hq-parameters.h"
+#include "ma.h"
+#include "psweep.h"
+#include <table.h>
+#include <list.h>
+#include <iostream.h>
+#include <clrandom.h>
+#include <clstring.h>
+#include <priorque.h>
+
+extern int FOLLOWPOLICY;
+extern int ROOTEXPLORE;
+class MaxNode;
+class QNode;
+class SAP;
+
+// purpose: encode values returned by MaxNode::evaluate() and QNode::evaluate()
+// we save every feature vector for later use during backups. 
+class ValueResult
+{
+public:
+  ValueResult(float total, float current, QNode * opr,
+	      ActualParameterList * apl, vector<float> * fv):
+    totalValue(total),           
+    currentValue(current),
+    op(opr),
+    actualParameters(apl),
+    features(fv) {};
+
+  virtual ~ValueResult() {
+    if (actualParameters) delete actualParameters;
+    if (features) delete features;
+  }
+
+  // data
+  float totalValue;             // V(i,s)
+  float currentValue;           // C(i,s,a)
+  QNode * op;                   // action a
+  ActualParameterList * actualParameters;  // action a's params
+  vector<float> * features;     // feature vector indexing C(i,s,a)
+};
+
+typedef list<ValueResult *> MaxQPath;
+typedef listIterator<ValueResult *> MaxQPathIterator;
+
+ostream & operator << (ostream &, ValueResult &);
+ostream & operator << (ostream &, MaxQPath &);
+ostream & operator << (ostream &, list<MaxQPath *> &);
+void deletePath (MaxQPath * & path);
+void deletePathList (list<MaxQPath *> * & pathList);
+
+// we need to remember the calling stack of max nodes in order to
+// check for termination
+class ActivationRecord
+{
+public:
+  // constructors and destructors
+  ActivationRecord(MaxNode * mn, ActualParameterList * apl):
+    node(mn), actualParameters(apl) {};
+  
+  // data
+  MaxNode * node;
+  ActualParameterList * actualParameters;
+};
+  
+// information about rewards.  Every reward is the reponsibility of
+// one or more possible Q nodes.   See MaxNode::executePrimitive()
+class RewardRecord
+{
+public:
+  RewardRecord(float amount, list<QNode *> * rnl):
+    reward(amount),
+    responsibleNodeList(rnl){};
+  ~RewardRecord() { };  // we do not delete responsibleNodeList
+			// because it is always a shared global
+			// pointer defined in atc-maxq.c
+    
+  // data
+  float reward;			// amount of reward 
+  list<QNode *> * responsibleNodeList; // list of responsible nodes
+};
+
+ostream & operator << (ostream & str, RewardRecord & ri);
+
+// ======================================================================
+// Reward Handling
+//
+// When a reward is received, it is subdivided into a list of
+// RewardRecord entries (see MaxNode::executePrimitive) and passed up
+// the hierarchy.  At each MaxNode, we decide whether to take
+// responsibility for a RewardRecord.  If we do, we delete it from the
+// list and add its reward into the TotalReward.  When a MaxNode
+// terminates, it passes the TotalReward upward.
+//
+
+class RewardInfo: public list<RewardRecord *>
+{
+public:
+  // constructors
+  RewardInfo(): TotalReward(0), NSteps(0), list<RewardRecord *>()
+  {};
+  virtual ~RewardInfo() {
+    // release the RewardRecord's
+    listIterator<RewardRecord *> itr(*this);
+    for (itr.init(); !itr; ++itr) delete itr();
+  }
+
+  // data fields
+  float                TotalReward;
+  int                  NSteps;
+};
+
+typedef listIterator<RewardRecord *> RewardInfoIterator;
+
+ostream & operator << (ostream & str, RewardInfo & ri);
+
+// declare type for hand-coded policy functions:  PolicyFunction
+typedef QNode * (*PolicyFunction)(STATE &,
+				  ActualParameterList &,
+				  ActualParameterList &);
+
+// ======================================================================
+//
+// Function Approximation
+//
+// This is an abstract class that unifies tables and networks and any
+// other function approximators we end up using in the future.
+//
+class FunctionApproximator
+{
+public:
+  // constructor
+  FunctionApproximator(QNode * qn): qnode(qn) {};
+
+  // predict the value of the state described by the given feature
+  // vector. 
+  virtual float Predict(vector<float> * fv) = 0;
+  // 
+  virtual float Train(vector<float> * fv, float targetValue,
+		     float learningRate) = 0;
+  virtual void Store(vector<float> * fv, float newValue) = 0;
+  virtual void print(ostream & str) = 0;
+  virtual void read(istream & str) = 0;
+  virtual int countNonZeroWeights() = 0;
+  virtual void clobberZeroWeights(float val) = 0;
+  virtual int Visits(vector<float> * fv) = 0;
+  virtual void IncrementVisits(vector<float> * fv) = 0;
+  QNode * qnode;
+
+};
+
+class TableFunctionApproximator: public FunctionApproximator
+{
+public:
+  TableFunctionApproximator(QNode * qn, STATE & state);
+  vector<float> * table;
+  virtual float Predict(vector<float> * fv);
+  virtual float Train(vector<float> * fv, float targetValue,
+		     float learningRate); 
+  virtual void Store(vector<float> * fv, float newValue);
+  int index(vector<float> *fv);
+  float & lookup(vector<float> *fv);
+  virtual void print(ostream & str);
+  virtual void read(istream & str);
+  virtual int countNonZeroWeights();
+  virtual void clobberZeroWeights(float val);
+  virtual int Visits(vector<float> * fv);
+  virtual void IncrementVisits(vector<float> * fv);
+  
+  vector<int> * counts;
+  STATE & state;		// we need this in order to look up
+				// feature sizes, which can depend on
+				// the particular kind of state.
+};
+
+class NNFunctionApproximator: public FunctionApproximator
+{
+public:
+  NNFunctionApproximator(QNode * qn, clrandom & rng);
+  ScaledSigmoidNetwork * net;
+  virtual float Predict(vector<float> * fv);
+  virtual float Train(vector<float> * fv, float targetValue,
+		     float learningRate); 
+  virtual void Store(vector<float> * fv, float newValue);
+  virtual void print(ostream & str);
+  virtual void read(istream & str);
+  virtual int countNonZeroWeights();
+  virtual void clobberZeroWeights(float val);
+  virtual int Visits(vector<float> * fv);
+  virtual void IncrementVisits(vector<float> * fv);
+
+};
+
+class MaxNode
+{
+public:
+  // constructors and destructors
+  // define a primitive max node
+  MaxNode(char * nm, Action * keyAction): isPrimitive(1),
+    action(keyAction), name(nm), mark(0), PSQ(0) {};
+  // define a composite max node
+  MaxNode(char * nm,
+	  FormalParameterList * fpl,
+	  Predicate * pcp,
+	  Predicate * tp,
+	  Predicate * gp,
+	  list<QNode *> * childlist,
+	  list<ParameterName *> * fs,
+	  PolicyFunction p, float ngp):
+    name(nm),
+    formalParameters(fpl),
+    preconditionPredicate(pcp),
+    terminationPredicate(tp),
+    goalPredicate(gp),
+    isPrimitive(0),
+    children(childlist),
+    temperature(0.0),
+    minTemperature(0.0),
+    learningRate(0.0),
+    coolingRate(1.0),
+    policyProbability(0.0),
+    mark(0),
+    policy(p),
+    requirePolicy(0),
+    performValueIteration(0),
+    logOutput(0),
+    nonGoalTerminationPenalty(ngp),
+    remainingExplorations(0),
+    features(fs),
+    PSQ(0) {};
+  
+  // methods
+  void init(clrandom &, HQParameters & params, STATE & state);
+
+  // evaluate a state
+  MaxQPath * evaluate(STATE & state,
+		      ActualParameterList & apl,
+		      int useTilde,
+		      int indent = 0);
+      // note, whoever receives MaxQPath * must delete it.
+
+  // evaluate all possible paths (mostly for debugging)
+  list<MaxQPath *> * evaluateList(STATE & state,
+				  ActualParameterList & apl,
+				  int useTilde);
+      // note, whoever receives a list<MaxQPath *> must delete it after
+      // extracting the desired information.
+
+  // return a list of legal actions and their values
+  list<MaxQPath *> * possibleActions(STATE & state,
+				     ActualParameterList & apl);
+
+  // execute this node (possibly with exploration)
+  RewardInfo * execute(STATE & state, ActualParameterList & apl,
+		       list<ActivationRecord *> & stack,
+		       list<STATE *> & upwardSaps,
+		       clrandom & rng,
+		       HQParameters & params,
+		       int & stepQuota,
+		       int & explorationCount,
+		       float & totalBellmanError,
+		       int & childWasInterrupted);
+      // note, RewardInfo must be deleted by caller.
+
+  RewardInfo * executePrimitive(STATE & state, 
+				ActualParameterList & apl,
+				HQParameters & params,
+				list<STATE *> & upwardSaps,
+				int & stepQuota,
+				clrandom & rng);
+
+      // note, RewardInfo must be deleted by caller.
+
+  RewardInfo * executeComposite(STATE & state,
+				ActualParameterList & apl,
+				list<ActivationRecord *> & stack,
+				list<STATE *> & upwardSaps,
+				clrandom & rng,
+				HQParameters & params,
+				int & stepQuota,
+				int & explorationCount,
+				float & totalBellmanError,
+				int & childWasInterrupted);
+      // note, RewardInfo must be deleted by caller.
+
+  RewardInfo * PSexecuteComposite(STATE & state,
+				ActualParameterList & apl,
+				list<ActivationRecord *> & stack,
+				list<STATE *> & upwardSaps,
+				clrandom & rng,
+				HQParameters & params,
+				int & stepQuota,
+				int & explorationCount,
+				float & totalBellmanError,
+				int & childWasInterrupted);
+      // note, RewardInfo must be deleted by caller.
+
+  // implement the exploration policy
+  void ExplorationPolicy(STATE & state,
+			 ActualParameterList & apl,
+			 list<ActivationRecord *> & stack,
+			 clrandom & rng,
+			 HQParameters & params,
+			 QNode * & chosenChild,
+			 ActualParameterList * & chosenAPL,
+			 int Trace,
+			 int & explorationCount);
+
+  // update transition model entries for this transition
+  void UpdateTransitionModel(STATE & startState,
+			     ActualParameterList & APL,
+			     QNode * child,
+			     ActualParameterList & childAPL,
+			     STATE & resultState,
+			     float reward,
+			     StateHashCode & startCode,
+			     SuccessorInfo * & succi);
+
+  // empirical value iteration (Q style)
+  void ValueIteration(STATE & state,
+		      ActualParameterList & apl,
+		      list<ActivationRecord *> & stack,
+		      clrandom & rng,
+		      HQParameters & params,
+		      int stepsPerChild,
+		      int & explorationCount,
+		      float & totalBellmanError,
+		      int & bellmanCount,
+		      int iterations);
+
+  // compute the path with maximum totalValue and return it
+  float value(list<MaxQPath *> * paths);
+
+  int ancestorHasTerminated(STATE & state,
+			    list<ActivationRecord *> & stack,
+			    int & inGoalState);
+
+  MaxQPath * boltzmannExploration(list<MaxQPath *> * paths,
+				  STATE & state,
+				  clrandom & rng,
+				  int & explorationCount,
+				  HQParameters & params,
+				  int Trace);
+
+  MaxQPath * matchingPath(STATE & state,
+			  list<MaxQPath *> * paths,
+			  ActualParameterList & apl,
+			  clrandom & rng,
+			  list<ActivationRecord *> & stack,
+			  HQParameters & params);
+
+  void CheckDownwardParameters();
+  void CheckPredicates();
+
+  void save(ostream & str);
+  void read(istream & str);
+  void setTemperature(float temp, float coolingRate, float minTemp);
+  void saveTemperature();
+  void restoreTemperature();
+  void setLearningRate(float lrate);
+  void printTemperatures();
+  void setPolicyProbability(float pp);
+  int  countNonZeroWeights();
+  int  countNonZeroWeightsRoot();
+  void clobberZeroWeights(float val);
+  void clobberZeroWeightsRoot(float val);
+  void clearMarks();
+  MaxNode * findMaxNode(string & nodeName);
+  void Debugger(STATE & state,
+		list<ActivationRecord *> & stack,
+		ActualParameterList & apl);
+  StateHashCode HashState(STATE & state, ActualParameterList & apl);
+  StateInfo * LookupState(STATE & state,
+			  ActualParameterList & apl);
+  void DisplayTransitionModel();
+  SuccessorInfo * findMatchingSuccessorInfo(StateHashCode code,
+					    QNode * action,
+					    ActualParameterList * apl);
+  void PrioritizedSweeping(int nsteps);
+  void pushNewPSQs(STATE * state,
+		   ActualParameterList * apl,
+		   float deltaValue,
+		   StateInfo * si);
+  void PrintPQSize();
+
+
+  // data 
+  char *            name;
+  FormalParameterList * formalParameters;
+  list<QNode *> *   children;
+  Predicate*        preconditionPredicate;
+  Predicate*        terminationPredicate;
+  Predicate*        goalPredicate;
+  int               isPrimitive;        // true if this is a primitive MaxNode
+  Action *          action;	        // action to perform
+  float             temperature;        // exploration temperature
+                    // also used for "epsilon" in epsilonGreedy exploration
+  float             savedTemperature;   // when temporarily disable learning
+  float             coolingRate;        // cooling rate of exploration
+					// temperature or epsilonGreedy
+  float             savedCoolingRate;   // when temporarily disable learning
+  float             minTemperature;     // minimum value of temperature
+  float             savedMinTemperature; // when temporarily disabling
+					 // learning
+  float             learningRate;       // learning rate
+  float             savedLearningRate;  // for temporarily storing it
+  float             policyProbability;  // probability of following policy
+  int               requirePolicy;      // if true, always follow policy
+  int               performValueIteration; // if false, don't VI at this node
+  PolicyFunction    policy;
+  int               mark;               // used by various algs that
+					// traverse the graph to ensure
+					// that each node is visited
+					// exactly once
+  MovingAverage  *  BellmanError;
+  int               logOutput;	        // true if learning should be logged
+				        // on output
+  float             nonGoalTerminationPenalty;
+  int               remainingExplorations; // monitor counter-based explore
+
+  // prioritized sweeping data structures
+  list<ParameterName *> *  features;    // used for hashing
+  vector<float> *          fv;	        // feature vector (for hashing)
+  table<StateHashCode, StateInfo *>  * transitionModel; 
+  heap<PSQItem>            PSQ;         // Prioritized Sweeping queue
+};
+
+ostream & operator << (ostream &, MaxNode &);
+
+// generic function for computing feature vectors
+void computeFeatureVector(STATE & state,
+			  ActualParameterList & apl,
+			  list<ParameterName *> * features,
+			  vector<float> * fv);
+ 
+//
+// Class QNode
+//
+// Every action, primitive or composite, has a Q node.  The Q nodes
+// store the C() and ~C() values, and they compute Q(i,s,j).
+//
+
+class QNode
+{
+public:
+  // constructors
+  QNode(char * nm, FormalParameterList * fpl, 
+	MaxNode & maxn,
+	ParameterPairList * ppl, list<ParameterName *> * fl, int nhu,
+	float minv, float maxv, int ut):
+    name(nm),
+    formalParameters(fpl),
+    child(maxn),
+    childParameters(ppl),
+    features(fl),
+    nHidden(nhu),
+    minValue(minv),
+    maxValue(maxv),
+    useTable(ut) {
+      // ensure that features is always bound, if only to an empty list
+      if (!features) features = new list<ParameterName *>;
+    };
+
+  // operations
+  void init(clrandom &, MaxNode *, HQParameters & params, STATE & state);
+  list<MaxQPath *> * evaluate(STATE & state,
+			      ActualParameterList & apl,
+			      int useTilde = 0,
+			      int indent = 0);
+
+  list<MaxQPath *> * evaluateList(STATE & state,
+				  ActualParameterList & apl,
+				  int useTilde = 0);
+
+  RewardInfo * execute(STATE & state,
+		       ActualParameterList & apl,
+		       list<ActivationRecord *> & stack,
+		       list<STATE *> & upwardSaps,
+		       clrandom & rng,
+		       HQParameters & params,
+		       int & stepQuota,
+		       int & explorationCount,
+		       float & totalBellmanError,
+		       int & childWasInterrupted);
+  void update(vector<float> & features,
+	      float backedUpValue,
+	      float backedUpValueTilde,
+	      float learningRate,
+	      float & bellmanError,
+	      float & bellmanErrorTilde);
+  void store(vector<float> & features,
+	     float backedUpValue,
+	     float backedUpValueTilde);
+  void generateBindingsAndFeatures(STATE & state,
+				   ActualParameterList & apl,
+				   list<MaxQPath *> * tildePaths);
+  void computeValues(STATE & state, ActualParameterList & apl,
+		     float & value, float & tildeValue);
+
+  void save(ostream & str);
+  void read(istream & str);
+  void CheckUpwardParameters(FormalParameterList * fpl);
+  int countNonZeroWeights();
+  void clobberZeroWeights(float val);
+  void clearMarks();
+  int OkToUpdate(HQParameters & params);
+
+  void ValueIteration(STATE & state,
+		      ActualParameterList & apl,
+		      list<ActivationRecord *> & stack,
+		      clrandom & rng,
+		      HQParameters & params,
+		      int stepsPerChild,
+		      int & explorationCount,
+		      float & totalBellmanError,
+		      int & bellmanCount,
+		      int iterations);
+
+  // data
+  char *                 name;
+  FormalParameterList  * formalParameters;
+  MaxNode &              child;
+  MaxNode *              parent;          // filled in by init()
+  ParameterPairList *    childParameters;
+  list<ParameterName *> *  features;
+  vector<float> *        fv;	          // feature vector
+
+  FunctionApproximator * costToGo;
+  FunctionApproximator * costToGoTilde;
+  int                    useTable;        // what kind of fa to use
+  int                    nHidden;
+  float                  minValue;        // minimum output value
+  float                  maxValue;        // maximum output value
+  int                    mark;            // used to avoid duplicates
+					  // during traversals
+protected:
+  ActualParameterList * mapActualParameters(ActualParameterList & apl,
+					    STATE & state);
+};
+
+ostream & operator << (ostream &, QNode &);
+
+class RewardResponsibility
+{
+public:
+  // constructor
+  RewardResponsibility(Error* de, list<QNode *> * rnl):
+    currentError(de),
+    responsibleNodeList(rnl) {};
+
+  // data
+  Error *  currentError;
+  list<QNode *> *   responsibleNodeList;
+};
+
+// state-action pairs.  
+// We save a list of state-action pairs (stored in reverse order).
+// Each SAP contains the QNode, feature vector, 
+// reward, and rewardTilde.  As we train the QNode VFA, we compute the
+// updated value by reprocessing the MaxQPath list.
+
+class SAP
+{
+public:
+  // constructor
+  SAP(QNode * childptr,
+      ActualParameterList * aplarg,
+      float rewardarg,
+      float rewardTildearg,
+      int steps):
+    child(childptr),
+    apl(aplarg),
+    reward(rewardarg),
+    rewardTilde(rewardTildearg),
+    nSteps(steps)
+  {};
+
+  ~SAP () {
+    if (apl) delete apl;
+  }
+
+  // data
+  QNode *               child;
+  ActualParameterList * apl;
+  float                 reward;
+  float                 rewardTilde;
+  int                   nSteps;
+};
+
+// some utility functions
+float unTildeValue(list<MaxQPath *> * tildePaths);
+float unTilde(MaxQPath * tildePath);  
+
+#endif

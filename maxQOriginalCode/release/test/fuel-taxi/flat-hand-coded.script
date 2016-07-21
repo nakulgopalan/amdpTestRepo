@@ -1,0 +1,8 @@
+# /bin/csh
+./fq-fuel-agent -b -t 5000 -c flat-hand-coded.con > flat-hand-coded.log
+../data.script flat-hand-coded
+#
+# Compute the mean performance of the flat-hand-coded policy
+# The last line of the file flat-hand-coded.mean will give the mean
+# performance. 
+../ma-file flat-hand-coded.data 6 5000 1 > flat-hand-coded.mean

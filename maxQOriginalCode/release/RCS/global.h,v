@@ -1,0 +1,36 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.04.25.14.54.49;	author tgd;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@// -*- C++ -*-
+//
+//  Global declarations
+
+#ifndef GLOBAL_H
+#define GLOBAL_H
+#include <list.h>
+
+extern int VERBOSE;
+extern const int worldSize;
+
+#endif
+
+@

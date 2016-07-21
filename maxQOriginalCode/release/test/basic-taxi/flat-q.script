@@ -1,0 +1,3 @@
+# /bin/csh
+./fq-agent -b -t 5000 -c flat-q.con > flat-q.log
+../data.script flat-q

@@ -1,0 +1,8 @@
+# /bin/csh
+./hq-fuel-agent -b -t 5000 -c h-hand-coded.con > h-hand-coded.log
+../data.script h-hand-coded
+#
+# Compute the mean performance of the h-hand-coded policy
+# The last line of the file h-hand-coded.mean will give the mean
+# performance. 
+../ma-file h-hand-coded.data 6 5000 1 > h-hand-coded.mean

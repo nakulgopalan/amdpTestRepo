@@ -1,0 +1,382 @@
+//  -*- C++ -*- 
+//
+//   Flat Q learning maxq hierarchy for taxi task.
+//
+//
+#include "predicate.h"
+#include "fueltaxi.h"
+#include "hq.h"
+#include "parameter.h"
+#include "global.h"
+#include <minmax.h>
+#include <stdlib.h>
+
+// ----------------------------------------------------------------------
+//
+// inherit termination
+//
+// ----------------------------------------------------------------------
+// In this domain, we do not inherit termination of parent nodes.
+int inheritTerminationPredicates = 0;
+float nonGoalTerminationPenalty = -100.0;
+
+int impTFalse(FuelTaxiState & state, ActualParameterList & apl)
+{
+  return 0;
+}
+
+Predicate TFalse(
+  /* name       */ "TFalse",
+  /* function   */ &impTFalse,
+  /* parameters */ 0);
+
+int impTTrue(FuelTaxiState  & state, ActualParameterList & apl)
+{
+  return 1;
+}
+Predicate TTrue(
+  /* name       */ "TTrue",
+  /* function   */ &impTTrue,
+  /* parameters */ makeArgs());
+
+int impTSimulationTerminatedAndPassengerDelivered(FuelTaxiState  & state,
+						  ActualParameterList & apl)
+{
+  return (state.Terminated() && state.source == None);
+}
+Predicate TSimulationTerminatedAndPassengerDelivered(
+  /* name       */ "TSimulationTerminatedAndPassengerDelivered",
+  /* function   */ &impTSimulationTerminatedAndPassengerDelivered,
+  /* parameters */ makeArgs());
+
+
+int impTSimulationTerminated(FuelTaxiState  & state, ActualParameterList & apl)
+{
+  return state.Terminated();
+}
+Predicate TSimulationTerminated(
+  /* name       */ "TSimulationTerminated",
+  /* function   */ &impTSimulationTerminated,
+  /* parameters */ makeArgs());
+
+// ----------------------------------------------------------------------
+//
+// Primitive nodes
+//
+// ----------------------------------------------------------------------
+MaxNode MaxNorth   ("MaxNorth",   &ActNorth);
+MaxNode MaxEast    ("MaxEast",    &ActEast);
+MaxNode MaxSouth   ("MaxSouth",   &ActSouth);
+MaxNode MaxWest    ("MaxWest",    &ActWest);
+MaxNode MaxPickup  ("MaxPickup",  &ActPickup);
+MaxNode MaxPutdown ("MaxPutdown", &ActPutdown);
+MaxNode MaxFillup  ("MaxFillup",  &ActFillup);
+
+list<ParameterName *> * allFeatures = makeList(&PTaxiX,
+					       &PTaxiY,
+					       &PSourceOrHeld,
+					       &PDestination,
+					       &PFuel);
+
+// ----------------------------------------------------------------------
+//
+// Primitive Actions
+//
+// ----------------------------------------------------------------------
+QNode QNorth(
+  /* name       */ "QNorth",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxNorth,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QEast(
+  /* name       */ "QEast",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxEast,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QSouth(
+  /* name       */ "QSouth",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxSouth,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QWest(
+  /* name       */ "QWest",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxWest,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QPickup(
+  /* name       */ "QPickup",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxPickup,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QPutdown(
+  /* name       */ "QPutdown",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxPutdown,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode QFillup(
+  /* name       */ "QFillup",
+  /* parameters */ makeArgs(),
+  /* child      */ MaxFillup,
+  /* child args */ makePPL(),
+  /* features   */ allFeatures,
+  /* nhidden    */ 4,
+  /* minValue   */ -40.123,
+  /* maxvalue   */ 0.0,
+  /* useTable   */ 1);
+
+QNode * PolicyRoot(FuelTaxiState & state,
+		   ActualParameterList & apl,
+		   ActualParameterList & cpl)
+{
+  // There are four policies in general:
+  // 1. pickup, putdown
+  // 2. pickup, fillup, putdown
+  // 3. fillup, pickup, putdown
+  // 4. fillup, pickup, fillup, putdown
+
+  // Determine current goal:  source, destination, or fuel.
+  enum Goal {GSource, GDestination, GFuel};
+  Goal goal = GSource;
+
+  if (state.source != Held) {
+    // Goal is either Fuel or Source.
+    if (state.Distance(state.location, state.source) +
+	state.Distance(state.source, state.destination) <= state.fuel) {
+      // we can do everything without refueling.  Case 1.
+      goal = GSource;
+    }
+    else {
+      // is case 2 possible?
+      int case2 = state.Distance(state.location, state.source) +
+	state.Distance(state.source, Fuel);
+      if (case2 <= state.fuel) {
+	// Yes, case 2 is possible, so we must compare against case 3.
+	// Is case 3 possible?  After fueling, goto source and dest.
+	int case3 = state.Distance(Fuel, state.source) +
+	  state.Distance(state.source, state.destination);
+	if (case3 <= 12) {
+	  // Yes, case3 is possible, so we must compare case2 and
+	  // case3.
+	  case2 += state.Distance(Fuel, state.destination);
+	  case3 += state.Distance(state.location, Fuel);
+	  if (case2 < case3) goal = GSource;
+	  else goal = GFuel;
+	}
+	else {
+	  // Only case 2 is possible.
+	  goal = GSource;
+	}
+      }
+      else goal = GFuel;
+    }
+  }
+  else {
+    // Goal is either Fuel or Destination.
+    if (state.Distance(state.location, state.destination) <= state.fuel) {
+      // we can make it without refueling
+      goal = GDestination;
+    }
+    else goal = GFuel;
+  }
+
+
+
+  switch (goal) {
+  case GSource:
+    {
+      // go to source location
+      if (state.location == state.SourcePoint()) {
+	// we are there, so pickup
+	return &QPickup;
+      }
+      else {
+	if (state.source == Red) {
+	  if (state.location.x < 2) {
+	    if (state.location.y < 4) return &QNorth;
+	    else return &QWest;
+	  }
+	  else if (state.location.y == 2) return &QWest;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.source == Yellow) {
+	  if (state.location.x == 0) return &QSouth;
+	  else if (state.location.y == 2) return &QWest;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.source == Green) {
+	  if (state.location.x > 1) {
+	    if (state.location.y < 4) return &QNorth;
+	    else return &QEast;
+	  }
+	  else if (state.location.y == 2) return &QEast;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.source == Blue) {
+	  if (state.location.x > 2) {
+	    if (state.location.y > 0) return &QSouth;
+	    else return &QWest;
+	  }
+	  else if (state.location.y == 2) return &QEast;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+      }
+    }
+  case GDestination:
+    {
+      // go to destination
+      if (state.location == state.DestinationPoint()) {
+	// we are there so putdown
+	return &QPutdown;
+      }
+      else {
+	if (state.destination == Red) {
+	  if (state.location.x < 2) {
+	    if (state.location.y < 4) return &QNorth;
+	    else return &QWest;
+	  }
+	  else if (state.location.y == 2) return &QWest;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.destination == Yellow) {
+	  if (state.location.x == 0) return &QSouth;
+	  else if (state.location.y == 2) return &QWest;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.destination == Green) {
+	  if (state.location.x > 1) {
+	    if (state.location.y < 4) return &QNorth;
+	    else return &QEast;
+	  }
+	  else if (state.location.y == 2) return &QEast;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+	else if (state.destination == Blue) {
+	  if (state.location.x > 2) {
+	    if (state.location.y > 0) return &QSouth;
+	    else return &QWest;
+	  }
+	  else if (state.location.y == 2) return &QEast;
+	  else if (state.location.y > 2) return &QSouth;
+	  else return &QNorth;
+	}
+      }
+    }
+  case GFuel:
+    {
+      // go to Fuel
+      if (state.location == state.FuelPoint()) {
+	// we are there, so fill up
+	return &QFillup;
+      }
+      else {
+	if (state.location.x == 2) {
+	  if (state.location.y < 1) return &QNorth;
+	  else return &QSouth;
+	}
+	else if (state.location.x == 0) {
+	  if (state.location.y > 2) return &QSouth;
+	  else if (state.location.y < 2) return &QNorth;
+	  else return &QEast;
+	}
+	else if (state.location.x == 1) {
+	  if (state.location.y > 2) return &QSouth;
+	  else return &QEast;
+	}
+	else if (state.location.x > 2) {
+	  if (state.location.y > 2) return &QSouth;
+	  else if (state.location.y < 2) return &QNorth;
+	  else return &QWest;
+	}
+      }
+    }
+  }
+}
+
+MaxNode MaxRoot(
+  /* name                  */ "MaxRoot",
+  /* parameters            */ makeArgs(),
+  /* precondition pred     */ &TTrue,
+  /* termination predicate */ &TSimulationTerminated,
+  /* goal predicate        */ &TSimulationTerminatedAndPassengerDelivered,
+  /* children              */ makeList(&QNorth, &QEast, &QSouth, &QWest,
+				       &QPickup, &QPutdown, &QFillup),
+  /* features              */ allFeatures,
+  /* policy                */ &PolicyRoot,
+  /* nonGoal penalty       */ -100.0);
+
+
+// ----------------------------------------------------------------------
+//
+// Reward Decomposition
+//
+// ----------------------------------------------------------------------
+
+
+list<QNode *> * primitiveQNodes = makeList(&QNorth, &QEast, &QSouth, &QWest,
+					   &QPickup, &QPutdown, &QFillup);
+
+list<QNode *> * topLevelQNodes = makeList(&QNorth, &QEast, &QSouth, &QWest,
+					  &QPickup, &QPutdown, &QFillup);
+
+list<RewardResponsibility *> * RewardDecomposition = makeList(
+  new RewardResponsibility(&TENone,           // no error 
+			   primitiveQNodes),
+  new RewardResponsibility(&TENotAtFuel,      // attempt to fillup not at Fuel
+			   primitiveQNodes),
+  new RewardResponsibility(&TEEmpty,          // no fuel left
+			   primitiveQNodes),
+  new RewardResponsibility(&TEAlreadyHolding, // already holding
+                           primitiveQNodes),
+  new RewardResponsibility(&TENoPassenger,    // bad putdown
+	    	           primitiveQNodes),
+  new RewardResponsibility(&TENotAtSource,    // can't pickup
+		           primitiveQNodes),
+  new RewardResponsibility(&TENotHolding,     // bad putdown
+		           primitiveQNodes),
+  new RewardResponsibility(&TENotAtDestination, // bad putdown
+		           primitiveQNodes));
+
+

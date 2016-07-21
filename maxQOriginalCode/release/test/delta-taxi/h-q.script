@@ -1,0 +1,3 @@
+# /bin/csh
+./hq-delta-agent -b -t 10000 -c h-q.con > h-q.log
+../data.script h-q

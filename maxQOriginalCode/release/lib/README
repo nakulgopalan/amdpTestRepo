@@ -1,0 +1,58 @@
+Fri Dec 24 13:00:42 1999
+
+Documentation on these files.
+
+hash.h/c
+        defines a very simple hash table class hashTable.
+        This class simply implements a vector of buckets.  
+        It is intended to be used as a base class.  It does not
+        implement equal hash tables.
+
+table.h/c
+        defines a more sophisticated hash table-based dictionary.
+        Each bucket is now a linked-list dictionary. 
+
+        table(max-size, hash-function)
+
+        operator[]
+        removeKey
+
+        It uses equality tests over keys, so if we are going to use
+        feature vectors as keys, then we would need equality tests
+        over vectors. 
+
+I'm in the middle of implementing a new data structure, a deltaheap,
+which allows the priorities of items to be changed.  It also permits
+hashed access to the items in the priority queue.
+
+
+
+Explanation of random number situation:
+
+clrandom.h: Budd's random numbers weren't very good, so I hijacked the
+gnu RNG and encapsulated it in his interface.
+
+clrandom.h includes gnu-mlcg.h
+  and clrandom contains an MLCG called Generator
+
+gnu-mlcg.h includes gnu-rng.h
+           class MLCG: public RNG
+           asLong() = 32 bits of randomness
+           reset()
+           inherits asDouble() and asFloat()
+
+gnu-mlcg.cc implements asLong() which does the work.  The other
+routines just mess with the work to bash into various formats.
+
+gnu-rng.h defines RNG (which is a base class for MLCG)
+          RNG() (constructor)
+          asLong and reset as pure virtual
+          asFloat and asDouble
+
+Mon Feb 12 10:23:04 2001
+
+I can't get gnu-rng.h to work properly under linux on my laptop, so
+I'm going to try switching to ranlib as the rng.  I checked with the
+author of the gnu routines, and he refers people to the ranlib
+routines.
+

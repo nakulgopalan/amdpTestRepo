@@ -1,0 +1,35 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.04.25.14.54.48;	author tgd;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@// -*- C++  -*-
+
+#ifndef HQ_TABLE_H
+#define HQ_TABLE_H
+
+#include "parameter.h"
+#include <vector.h>
+#include <list.h>
+
+float & lookup(vector<float> * table, vector<float> * fv, list<ParameterName> * features);
+
+#endif
+@

@@ -1,0 +1,762 @@
+This is Release 1 of Dietterich's MAXQ code.
+
+Before going further, you should first read the JAIR paper:
+
+Dietterich, T. G. (2000). Hierarchical Reinforcement Learning with the
+MAXQ Value Function Decomposition.  Journal of Artificial Intelligence
+Research, 13, 227--303.
+
+0. Installation
+
+The Makefile is a mess (sorry!).  You should first "cd" to the "lib"
+subdirectory and do "make all".  Then return back to the "release"
+directory, edit the Makefile to specify which domain you want to use,
+and then make the appropriate main program (e.g., TAXISTATE and "make
+hq-agent"). 
+
+The code is known to work under Red Hat linux.  It should also work
+under Solaris. 
+
+
+1. MDPs
+
+Each MDP is an instance of the State class (state.h).  It must define
+various methods, particularly 
+
+    Act()  which defines the effect of each
+           action and returns the immediate reward for actions.  
+
+    Init() which initializes the MDP
+    Terminated() tests for termination. 
+
+Each MDP is also responsible for defining the features that will be
+used to represent its Q function.  These are defined by three methods:
+
+featureSize()
+    returns the number of distinct values of a feature (all
+    features are assumed to be discrete, although their values are
+    floats for historical reasons), 
+
+featureValue()
+    computes the value of a feature
+
+insertFeature()
+    inserts the current value of a feature into a feature vector.
+    Features can either be features of the state or they may be
+    computed from the parameters passed to a QNode.  
+
+Each action is defined as an instance of the Action class (state.h).
+
+Each feature is assigned a name, an instance of ParameterName
+(parameter.h).  
+
+Each parameter is also assigned a name, an instance of ParameterName. 
+
+Each MDP must also define an iterator which will iterate over all of
+the states in the MDP.  This is used in some experimental Value
+Iteration code (see hq-agent.c) which is not robust and should not be
+executed (see Dead Features section below).
+
+
+2. Defining an MDP
+
+An MDP is defined by two files.  For example, taxi.h and taxi.c define
+the taxi domain as follows:
+
+taxi.h defines TaxiState by subclassing State.  It declares the state
+       variables.  It also defines a TaxiStateIterator.  It declares
+       any variables that will be needed in the maxq file for the
+       domain (see below).
+
+taxi.c implements the TaxiState methods.  It is responsible for
+       declaring all actions, parameters, and errors.  
+
+In addition, items need to be added to hq-agent.c (to handle
+interactive execution of actions) and to get-state.h (to properly
+define the STATE symbol).  Finally, additions must be made to the
+Makefile and one or more maxq.c files must be written to specify the
+structure of the MAXQ graph.
+
+
+3. Defining the MAXQ Graph for an MDP
+
+3.1  The MAXQ file
+
+Each MDP requires one or more maxq files.  Let's look at flat-maxq.c
+to see a simple maxq file.  This file defines the MaxNode's and
+QNode's that make up the maxq hierarchy.  In this case, the hierarchy
+is simply one level with one Max node:   MaxRoot.
+
+Each MaxNode is declared using a constructor with several fields.  
+
+name: This is a string that gives the name of the max node.
+
+parameters: This defines the formal parameters of this max node using
+      another constructor called makeArgs.
+
+precondition pred: This is unused.  I always initialize it to &TTrue.
+
+termination predicate: This is very important.  It defines the
+      termination condition for the max node.  
+
+goal predicate: This is also very important.  It defines when the Max
+      node has terminated SUCCESSFULLY.  Note that the goal predicate
+      should imply the termination predicate.  Failure to make this
+      true is a common programming error.
+
+children: This is a list of the child Q nodes of this Max node.
+
+features: This is a list of features to be used for learning a
+      transition model of the behavior of the child Q nodes.  It is
+      used in the prioritized sweeping code (another Dead Feature). 
+
+policy: This specifies a hand-coded policy to execute for this node.
+
+nonGoal penalty: This is the pseudo-reward given when the MDP enters a
+      state for which the termination predicate is true but the goal
+      predicate is false.
+
+Each QNode is also declared by a complex constructor with the
+following fields:
+
+name:     textual name for the node.
+
+parameters:  the formal parameters of this node (see Parameter Passing
+      below)
+
+child:    The child MaxNode of this QNode.  Every QNode corresponds to
+      exactly one MaxNode.
+
+child args:  This specifies how the actual parameters are bound to the
+      child max node's formal parameters.  (see Parameter Passing
+      below)
+
+features: This specifies which features will be used to index the
+      Completion functions for this Q node.  By omitting features from
+      this list, you are forcing state abstraction. 
+
+nhidden: This specifies the number of hidden nodes if a neural network
+      is used to represent the completion functions.  However, this is
+      a Dead Feature (see below).
+
+minValue: This specifies the initial value for the completion
+      functions.  By convention, it should end in .123.  We use this
+      to detect (approximately) when a completion function value has
+      been changed during learning.
+
+      In the case of neural network function approximators, this
+      specifies the minimum value for the scaled output of the
+      network.  (see Dead Features).
+
+maxValue: For neural network function approximators, this specifies
+      the maximum value of the scaled output of the network (see Dead
+      Features). 
+
+useTable: if true, we use a table function approximator (i.e., just a
+      table) to represent the completion function.  If false, we use a
+      neural network (but this is a Dead Feature, so always set this
+      to 1).
+
+Note that leaf MaxNodes are declared using a different constructor.
+Also note, that leaf Max nodes do NOT store their expected rewards.
+See Reward Handling below.
+
+3.2 Parameter Passing
+
+Parameter passing is implemented by a slightly brain dead method.  To
+understand it, take a look at h-maxq.c, the MAXQ file for the basic
+taxi MDP with hierarchical Q learning.  
+
+First, let's study the MaxNavigate node.  We see 
+
+  /* parameters            */ makeArgs(AnySite, &PTarget),
+
+which says that MaxNavigate takes one formal parameter.  The TYPE of
+this parameter is "AnySite" which is defined near the top of
+h-maxq.c.  The NAME of the formal parameter is PTarget (which is
+declared in taxi.c).  
+
+The makeArgs construct accepts 2, 4, 6, or 8 arguments alternating
+between ParameterType's and ParameterNames. See parameter.h.
+
+Now, look at QNavigateForGet.  Here we see the following:
+
+  /* child      */ MaxNavigate,
+  /* child args */ makePPL(&PSource, &PTarget),
+
+This says that the PSource parameter/feature at QNavigateForGet should
+be bound to the PTarget formal parameter of MaxNavigate.  The makePPL
+constructor accepts 2, 4, 6, or 8 arguments alternating between actual
+and formal parameter names.  See parameter.h.
+
+The formal->actual parameter mapping is implemented by a data
+structure known as an ActualParameterList.  This is passed through the
+MAXQ hierarchy.  A problem with this is that it accumulates pairs, so
+that you should never have two formal parameters with the same name
+visible from the same MAXQ node.  That is, if A calls B and B calls C,
+the formal parameters of B should not have the same names as the
+formal parameters of C.  Formal parameters can be specified as
+features in a QNode (and they must be handled by the feature routines
+in the MDP). 
+
+3.3 Predicates and Policies
+
+MaxNode's require termination and goal predicates (and precondition
+predicates -- a Dead Feature).  These predicates may need to examine
+the formal parameters, so we have defined a predicate interface (see
+predicate.h/.c).  A predicate is declared by a constructor with three
+fields:
+
+name: A string name for the predicate
+function: A pointer to the C++ function that implements the predicate
+parameters: A list of parameter types and names
+
+For example, consider the TAtTarget predicate in h-maxq.c.  It
+contains the following:
+
+  /* function   */ &impTAtTarget, 
+  /* parameters */ makeArgs(AnySite, &PTarget));
+
+Again, the parameter type is AnySite and the parameter name is PTarget
+(passed as a pointer). 
+
+The function impTAtTarget implements this predicate.  You will see
+that it takes two arguments: A reference to the current state of the
+MDP and a reference to an ActualParameterList, which specifies the
+formal->actual parameter mapping.  This predicate checks whether the
+current location of the taxi matches the target location (specified in
+a global array Sites, defined in taxi.c). 
+
+A policy is a standard C++ function that accepts three arguments:  A
+reference to the current state, two references to actual parameter
+lists.  The function must return a pointer to a QNode, which is the
+child to be executed, and it returns an ActualParameterList cpl (the
+child parameter list) that specifies how the formal parameters of the
+chosen QNode are to be bound.  This cpl feature is not used in any of
+the taxi domains.  It was introduced for Parr's maze world domain
+(not included in this release).
+
+
+3.5 Reward Handling
+
+The reward system is seriously brain damaged.
+
+There are four important mappings to consider in the reward system:
+
+a. Mapping between actions and rewards
+b. Mapping between actions and errors
+c. Mapping between errors and responsible Q nodes
+d. Mapping between errors and rewards
+
+a and b are implemented by State::Act() (or its subclassed version).
+When Act() is invoked, it must do two things: (a) increment the
+cumulativeReward and (b) set the currentError.
+
+c is handled by the RewardDecomposition global variable defined in the
+maxq file.
+
+d is handled by hq.c: MaxNode::executePrimitive. 
+
+The system assumes that the reward function is not stochastic.  It is
+assumed that every action has a reward of -1.  executePrimitive checks
+to see if Act() changed the cumulativeReward by more than -1.  If so,
+the additional reward needs to be assigned to some set of responsible
+Q nodes.  executePrimitive checks the global variable currentError,
+looks up that error in RewardDecomposition, and assigns the additional
+reward to those Q nodes.  This information is stored in a linked list
+of RewardInfo records. 
+
+This linked list is analyzed by MaxNode::executeComposite to determine
+which Q nodes must handle the parts of the reward.  The standard -1
+reward is always assigned to the primitiveQNodes, so the leaf Q node
+will take responsibility for the -1 and update its C() value
+accordingly.  It then removes the -1 RewardInfo record.  If there are
+still other RewardInfo records to be processed, this means that
+executeComposite must return to its caller.  In other words, an
+un-handled extra reward causes terminations of Max nodes up the MAXQ
+graph until a Q node is found that will take responsibility for the
+extra reward.   There is somewhat complex logic to determine whether
+an interrupted MaxNode can update its C() functions or not before
+returning up the tree.
+
+To make this "system" work, the maxq file must define three global
+variables: RewardDecomposition, topLevelQNodes, and primitiveQNodes:
+
+primitiveQNodes is a list of pointers to all of the primitive Q
+nodes.  These are the Q nodes whose MaxQ children are the primitive
+actions and will take responsibility for the standard -1 rewards.
+
+topLevelQNodes is a list of pointers to the immediate children of the
+MaxRoot node.  These are the Q nodes that must take responsibility for
+any rewards not otherwise handled.
+
+RewardDecomposition is a linked list of RewardResponsibility records.
+Each of records tells which Q nodes are responsible for which errors.
+
+3.6 Other items in the MAXQ file
+
+The MAXQ file must define the variable inheritTerminationPredicates.
+If true, this means that each MAX node treats as its termination
+predicate the conjunction of its own predicate and those of all of its
+ancestors.  This is a subtle difference from the normal situation.
+
+Normally, if ANY ancestor of a max node terminates (because its
+termination predicate is true), this terminates the current max node.
+But there is a difference of interpretation if an ancestor node
+terminates BUT the current node's termination predicate is false.
+This is viewed as an INTERRUPTION of the current node, and the C()
+values of the MaxNode are not updated.
+
+With termination inheritance, it is treated as a standard termination,
+and the C() values are updated.  If inheritTerminationPredicates is
+true, then the Goal predicates are also terminated, and this affects
+the assessment of the nonGoalTerminationPenalty. 
+
+The termination penalty is assessed if a MaxNode terminates but the
+goal predicate is false.  This is a pseudo reward that affects Ctilde
+but not C.
+
+The maxq files also define a variable nonGoalTerminationPenalty, but
+this is a Dead Feature.  These penalties are now separately specified
+for each max node.
+
+4.0 A brief tour of the files making up the system.
+
+hq-agent.c      This is the main program.  Command line options
+                support interactive and batch execution.
+
+                The program is controlled by a parameter file, which
+                by convention ends in the ".con" suffix.  This is
+                specified to hq-agent by the "-c" command line
+                argument.  Examples of these files are given in the
+                "test" subdirectories. 
+
+hq.h            This file contains the heart of the system.  It
+                defines MaxNode and QNode as well as helper classes
+                for reward and interrupt handling.
+
+                Note that QNode contains pointers to two function
+                approximators:  costToGo (the C() function) and
+                costToGoTilde (the Ctilde() function). 
+
+                The QNode also contains a feature vector fv, which is
+                where we assemble the features to index into these
+                function approximators.  
+
+hq.c            This is the most important file in the system. 
+                You should study MaxNode::execute,
+                MaxNode::executePrimitive and
+                MaxNode::executeComposite to understand how the system
+                works.  See some notes below.
+
+state.h/c       Defines an abstract class for MDP states
+
+get-state.h     This is a file that uses ifdef's to define the
+                relationship between a set of variables TAXISTATE,
+                FUELTAXISTATE, and DELTATAXISTATE and the
+                corresponding .h files and class names that correspond
+                to those states.
+
+                I had trouble getting the right kind of polymorphism
+                in C++.  There is probably a way to do it, but I
+                couldn't make it work (particularly for defining
+                PredicateType in predicate.h).  Hence, in hq.c, hq.h,
+                predicate.h, state.h, and elsewhere, to write a
+                function that works with a generic state, it wasn't
+                sufficient to use the State class.  Instead, we use
+                the macro variable STATE, which is defined here in
+                get-state.h.
+
+                In turn, in the Makefile, the variable STATEFLAG
+                defines which kind of state we are using.  Hence, to
+                compile the program, you must do the following:
+
+                1. delete all .o files
+                2. edit the Makefile to set STATEFLAG to the
+                    appropriate kind of state.
+                3. make the appropriate main programs:
+                   hq-agent, fq-agent (for TAXISTATE)
+                   hq-fuel-agent, fq-fuel-agent (for FUELTAXISTATE)
+                   hq-delta-agent, fq-delta-agent (for DELTATAXISTATE)
+
+                
+                
+global.h  this declares two global variables.  The most important is
+VERBOSE, which is a global flag to turn on lots of tracing outputs.
+In fact, there are many global variables (sorry!!!) defined at the top
+of hq.c:
+
+EVALVERBOSE: prints out extra information when computing the Q-value
+or V-value of a state.
+
+LEARNVERBOSE: traces the learning process (C updates, etc.)
+
+There are options for setting these interactively in hq-agent.c and in
+the internal "debugger" (controlled by DEBUG).
+
+
+hps.c        These files implement prioritized sweeping for MAXQ.
+psweep.c/h   This is a Dead Feature.  It seems to work ok for the
+             basic-taxi, but not for the other MDPs.
+
+supporting files:
+
+atom.c/h     Defines atoms that know how to read and write themselves
+             and test for equality.  Parameters and Actions are
+             subclassed from Atom.
+
+getopt.c     Defines the getopt() command line parsing routine, just
+             in case it is not included in your particular brand of unix.
+
+hq-features.c/h  This defines a utility routine for mapping a multiple
+             valued feature into a set of boolean features.  It is
+             used for neural network mappings.  currently not used.
+
+hq-parameters.c/h This defines a data structure for passing around most
+             of the parameters that control the learning and execution
+             of maxq hierarchies.  This information is read from the
+             .con file and passed through the various maxq routines.
+
+             See Configuration File below.
+
+hq-table.c/.h  Defines basic routines for indexing into a function
+             approximator table.
+
+ma.c/h       Computes a moving average of a sequence of numbers.
+
+net.c/h      Basic feed forward neural networks.
+
+snet.c/h     Extends net.c/h to scale the output values.
+
+point.c/h    Defines a (x,y) point.  Useful in maze domains.
+
+predicate.c/h   Defines the Predicate class.
+
+
+5. The Configuration File
+
+Example configuration files are given in the "test" subdirectories,
+and they all contain some comments.  I have added extended comments to
+test/delta-taxi/h-q.con, please look there for details.
+
+The configuration file follows the format specified in
+hq-parameters.h.  Comments can be introduced in certain places by
+using //.  They can only be introduced BETWEEN objects.  So, for
+example, they cannot appear within a list.
+
+Advice on setting parameters:
+
+The proper setting of the learning rate depends on the degree of
+randomness in the domain.  In a deterministic problem, the rate should
+be set to 1.0.  In a random problem (e.g., delta-taxi), the rate must
+be set smaller than 1 to take a time average.
+
+The proper setting of the exploration controls also depends on the
+domain.  There are three supported exploration policies:  Boltzmann,
+epsilon greedy, and counter-based.  Each method is controlled by three
+numbers.  Each Max node has its own controls which default to the
+values of the global controls, but it is possible to specify them
+separately for each max node.
+
+For Boltzmann exploration the three numbers are:
+    initial temperature
+    cooling rate (each time a Max node experiences a goal termination,
+           it multiplies its temperature by this cooling rate)
+    minimum temperature (the temperature is not allowed to cool below
+           this value.  Usually 0)
+
+    Note: ties are broken randomly
+
+For Epsilon Greedy exploration the three numbers are
+    initial epsilon (usually 1.0)
+    amount to change epsilon (each time a Max node experiences a goal
+           termination, it subtracts this amount from epsilon)
+    minimum epsilon (the epsilon is not allowed to go below this
+           value.  Usually 0).
+
+    Note: ties are broken randomly
+
+For counter-based exploration, the three numbers are
+    required number of visits to this state:  We perform "balanced wandering".
+
+    Note: We are not randomly breaking ties, however, and this can
+    lead to problems in some domains.
+
+    The other two numbers are ignored.
+
+Setting the exploration rates is difficult.  In practice, I have done
+it by first executing the hand-coded policy in the top levels of the
+MAXQ hierarchy and just determining the parameters for the lowest
+level.  Then, I "thaw" successive levels of the hierarchy and tune
+them, and so on.  Higher levels must continue exploring beyond the
+point where lower levels have stopped exploring, but since cooling
+only occurs upon a goal termination, this can mean that the cooling
+rate is actually faster at higher levels rather than lower levels. 
+
+One tool that helps here is to monitor the behavior of the individual
+MaxNodes (see the entry "list of max nodes to monitor").  This
+dumps one line each time a max node terminates specifying the
+following:
+        trial number
+        deltaBellmanError:  how big was the bellman error
+        how many exploration actions were taken
+        how many explorations remain (for counter-based)
+        temperature 
+        total reward received
+        number of steps required
+        was the GoalPredicate true?
+        MaxNode name
+
+This allows you to monitor the temperature of each node and see when
+it stops exploring.
+
+Advice on Polling (Hierarchical Greedy) execution.  In
+test/delta-taxi/h-q-polling.con you can see how I set the polling
+parameters.  These match the settings described in the JAIR paper. 
+
+It seems to be important to gradually introduce polling execution.  If
+you introduce it too soon, it generally interferes with learning (and
+interferes with all-states-updating).  But it is important to
+introduce it during exploration and learning so that the C() values at
+intermediate states are learned.  I generally first turn it off, and
+calibrate the system to converge as best I can.  Then I enable polling
+execution, but starting with a large number of primitive actions and
+decreasing it so that it reaches 1 (i.e., pure polling) just about the
+time that it was converging before.  However, different domains
+require different settings.
+
+6. Command Line arguments
+
+  -c configuration-file         name of the configuration file
+  -s wts                        file on which to save weights
+  -r wts                        file from which to read weights
+  -b                            turn on batch mode
+  -t ntrials                    number of trials to execute in batch mode
+  -i ntrials                    perform a non-learning evaluation
+                                trial every ntrials.  During these
+                                trials, learning and exploration are disabled.
+  -x                            Dead Feature
+  -d seed                       Set the random number generator of the State.
+  -v niter                      Dead Feature (was value iteration)
+  -1                            Turn on single stepping
+
+  Normally, I use "-b -t 10000 -c foo.con" for batch execution
+  and "-c foo.con" for interactive execution.
+
+  Note that you can resume execution of a run if you have saved the
+  weights file from a previous execution.  When resuming, the random
+  number seeds and temperature settings are all read from the weights
+  file, so they cannot be changed from the configuration file or from
+  the command line arguments.
+
+
+6. Interactive Execution, Debugging,  and Single Stepping
+
+6.1 Memory Allocation
+
+When executed, hq-agent displays the following information for each
+QNode:
+
+feature:PTaxiX size 5
+feature:PTaxiY size 5
+feature:PSourceOrHeld size 6
+feature:PDestination size 4
+QNode: QNorth table size = 600
+feature:PTaxiX size 5
+feature:PTaxiY size 5
+feature:PSourceOrHeld size 6
+feature:PDestination size 4
+QNode: QNorth table size = 600
+
+This is a trace of its memory allocation.  Each node appears twice,
+once for C and once for Ctilde.  When defining a new domain, you
+should check to see that this looks right.
+
+6.2 Interactive Execution
+
+When executing interactively, hq-agent enters a command loop and
+prompts for a command:
+
+Evaluate state (e), follow policy (f), primitive action (a),
+  greedy value (g), set policyProbability (x), root quota (r), 
+  show options (o) for acting, clobber zero weights (b),
+  show params (c) toggle verbose (v), print state (p), single step (s)
+  invoke value iteration (i), toggle EVALVERBOSE (w),
+  show transition model (m), show PSQ sizes (#),
+  set temp (t), count nonzero weights (z), run tests ([), quit (q): 
+
+e: will evaluate the current state.  The evaluation prints out both
+the normal evaluation (i.e., computing Q(s,a)) and the
+tilde-evaluation (computing Qtilde(s,a), which incorporates the
+pseudo-rewards).  Here is what the display looks like:
+
+Normal evaluation: (((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QNorth (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QEast (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QSouth (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QWest (AnySite . 1) ))
+((0.246 0.123 QGet )(0.123 0.123 QPickup ))
+)
+Tilde evaluation: (((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QNorth (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QEast (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QSouth (AnySite . 1) ))
+((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QWest (AnySite . 1) ))
+((0.246 0.123 QGet )(0.123 0.123 QPickup ))
+)
+
+Each evaluation is a list of MaxQPath's.  
+Each MaxQPath reads as follows:
+(((0.369 0.123 QGet )(0.246 0.123 QNavigateForGet )(0.123 0.123 QNorth (AnySite . 1) ))
+   0.369 is the value of  Q(Root,s,Get)
+         0.123 is C(Root,s,QGet)
+   0.246 is the value of Q(Get,s,Navigate)
+         0.123 is C(Get,s,Navigate)
+   0.123 is the value of Q(Navigate,s,North)
+         0.123 is C(Navigate,s,North)
+         0.123 is V(North,s)
+
+The parameter binding PTarget = 1 is shown (rather cryptically) as a
+(type . value) pair.
+
+At the root, there is only one choice of action:  Get.  But under
+that, there will be 2 choices:  NavigateForGet and Pickup.  And under
+NavigateForGet, there will be 4 choices: North,East,South,West.
+
+f: Follow Policy.  This executes the current policy (including
+exploration, etc.) for maxStepsPerTrial steps (or as overridden by the
+'r' command -- see below).
+
+a: This allows the user to type in a single-letter name for each
+action. 
+
+g: Show the MaxQPath with the highest value.
+
+x: Set the policy probability.  You can set it to 1.0 to force all
+MaxNodes to execute the hand-coded policy or to 0.0 to force them to
+execute the learned policy.
+
+r: Root quota.  This tells how many primitive actions the 'f' command
+should perform.
+
+o: Shows the MaxQPath's of the different possible actions at the
+current Max node. 
+
+b: This allows you to reset all of the weights in the C() tables that
+still have their x.123 default values.  This can be useful for setting
+them all to be large negative values so that none of the un-visited
+actions will be executed.
+
+c: Display the settings of the parameters (i.e., from the .con
+file).  In most cases, if you have changed these settings using 'r',
+'x', 'v', such changes will NOT be shown by the 'c' command.
+
+v: Flip the values of the VERBOSE and LEARNVERBOSE flags.
+
+p: Print the current state
+
+s: Turn on single-stepping mode.  Under this mode, the debugger will
+be entered by each Max node before it executes an action.
+
+i: Invoke value iteration (Dead Feature)
+
+w: Flip the value of EVALVERBOSE.
+
+m: Displays the learned transition model (for prioritized
+sweeping). Dead Feature.
+
+#: Show the sizes of the Prioritized Sweeping priority queues.  Dead
+Feature.
+
+t: Set the temperatures, cooling rates, and min temperatures of all of
+the max nodes
+
+z: Count the number of C() table entries that have non-default values.
+
+[: Enters a sub-menu that depends on the domain.  Most of these are
+Dead Features, but one is "dump temperature information", which tells
+you the current temperature of each Max node.  Note that primitive
+nodes always have a temperature of 1.
+
+When implementing a new domain, the first thing I do is to use the 'p'
+and 'a' commands to manually execute all of the actions and check that
+they are working properly.
+
+Also, it is sometimes useful to load a saved weight file and observe
+how the learned policy behaves (by during on VERBOSE and using the 'r'
+and 'f' commands).  This can help identify problems with termination
+predicates and goal predicates.
+
+6.3 Single-Stepping and The Debugger
+
+There is a primitive debugger.  If you turn on single stepping (via
+'s') and then issue the 'f' command, you will enter a debugging loop.
+The prompt is:
+
+Stack backtrace (b), evaluate state (e), greedy value (g),show options (o) for acting, toggle single-step (s),toggle eval verbose (w), toggle verbose (v), print state (p), count nonzero weights (z),continue execution (c), abort (q): 
+
+b: Gives a stack backtrace such as
+   0	MaxNavigate(PTarget->1;)
+   1	MaxGet()
+   2	MaxRoot()
+
+   This shows that MaxRoot has called MaxGet which has called
+   MaxNavigate (with PTarget bound to 1). 
+
+e: Evaluate state.  Same as the top-level command loop.
+
+g: Greedy value.  Same as the top-level command loop.
+
+o: Show options.  Same as the top-level command loop.
+
+s: Turn off single stepping
+
+w: Flip EVALVERBOSE
+
+v: Flip VERBOSE and LEARNVERBOSE
+
+p: Print the current state
+
+z: Count non-zero weights.  Same as the top-level command loop.
+
+c: Continue: That is, execute the next action.
+
+q: Abort execution and terminate the program.
+
+
+
+7. Dead Features
+
+Since this is a piece of research software, it is littered with
+features that were added experimentally but never really
+bullet-proofed (actually, this probably applies to the whole program
+:-).  These include the following:
+
+  * Value Iteration.  A simple form of value iteration was implemented
+    in hq-agent, based on doing Monte Carlo executions to determine
+    the transition probabilities.
+
+  * Prioritized Sweeping.  This was implemented and tested on the
+    basic-taxi world.  But there still seem to be major bugs and
+    performance problems.  I will be working on an improved version of
+    it in the future.
+
+  * Neural network value function approximation.  This was the
+    original function approximator, but I haven't tested it in a long
+    time.  I'm sure the code doesn't work.
+
+  * Precondition predicates.  These should just be removed, since
+    MaxNode subtasks must be Markovian and re-entrant.  Hence, it
+    doesn't make sense to allow a precondition that must be initially
+    true but that can later be violated.
+
+  * global nonGoalTerminationPenalty.  This should be removed, since
+    it is superseded by individual penalties for each max node.
+
+  * -x command line option.  There used to be a way of initializing
+    the random number generators using the computer's real-time clock.
+    But I removed this because I couldn't get it to work under cygwin
+    in Windows.
+  
+  * WINDOWS98 variable in the Makefile and hq-agent.c.  This (and the
+    associated logic in hq-agent.c) could probably be removed.  It is
+    left over from a problem with old versions of g++.
+ 

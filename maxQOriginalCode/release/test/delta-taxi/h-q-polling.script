@@ -1,0 +1,3 @@
+# /bin/csh
+./hq-delta-agent -b -t 10000 -c h-q-polling.con > h-q-polling.log
+../data.script h-q-polling

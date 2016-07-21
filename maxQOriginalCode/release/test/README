@@ -1,0 +1,6 @@
+This directory tree contains test scripts for running the MAXQ code
+for three MDPs:
+
+basic-taxi:     noise-free, no fuel, not fickle
+fuel-taxi:      noise-free, fuel, not fickle
+delta-taxi:     actions are noisy, no fuel, fickle

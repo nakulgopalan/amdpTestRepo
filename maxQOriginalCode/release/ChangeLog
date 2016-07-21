@@ -1,0 +1,5 @@
+2002-04-25  Thomas G. Dietterich  <tgd@cs.orst.edu>
+
+	* atom.c, atom.h, delta-taxi.c, delta-taxi.h, flat-fuel-maxq.c, flat-maxq.c, fueltaxi.c, fueltaxi.h, getopt.c, get-state.h, global.h, h-fuel-maxq.c, h-fuel-nabs-maxq.c, h-maxq.c, hps.c, hq-agent.c, hq-features.c, Makefile, hq.c, hq-features.h, hq.h, hq-parameters.c, hq-parameters.h, hq-table.c, hq-table.h, ma.c, ma.h, net.c, net.h, parameter.c, parameter.h, point.c, point.h, predicate.c, predicate.h, psweep.c, psweep.h, snet.c, snet.h, state.c, state.h, taxi.c, taxi.h, taxi-maxq.h:
+	New file.
+

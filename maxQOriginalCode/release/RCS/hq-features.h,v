@@ -1,0 +1,33 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.04.25.14.54.48;	author tgd;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@// -*- C++ -*-
+//
+
+#ifndef HQ_FEATURES_H
+#define HQ_FEATURES_H
+#include <vector.h>
+
+void RepresentOneOfN(vector<float> & fv, int & i, int val, int n);
+
+#endif
+@

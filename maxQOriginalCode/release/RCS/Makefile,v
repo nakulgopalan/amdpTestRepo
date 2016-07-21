@@ -1,0 +1,454 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.2
+date	2002.04.25.22.11.40;	author tgd;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2002.04.25.14.54.49;	author tgd;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.2
+log
+@Removed parr, hdg, and ryan problems as well as lots of unused utility
+programs.
+@
+text
+@#
+#  Makefile
+#      ILIB is the directory where the include files will be found
+#
+
+# State Type: This must be set manually for the different domains.
+# You should also delete all .o files and do a clean make.
+STATEFLAG = -DDELTATAXISTATE
+
+
+ILIB    =./lib 
+
+CC     = g++
+CFLAGS = -g -O2 -I$(ILIB)  $(STATEFLAG)
+
+LIBS =  -lm
+RM     = rm -fr
+GETOPT = getopt.o
+OSTYPE = WINDOWS98
+
+#
+# programs
+#
+
+buddlib:
+	(cd lib; make all)
+
+fq-agent: taxi.o state.o atom.o flat-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o state.o atom.o flat-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-agent
+
+fq-fuel-agent: taxi.o fueltaxi.o state.o atom.o flat-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o fueltaxi.o state.o atom.o flat-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-fuel-agent
+
+fq-delta-agent: taxi.o delta-taxi.o state.o atom.o flat-delta-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o flat-delta-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-delta-agent
+
+hq-agent: taxi.o state.o atom.o h-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o state.o atom.o h-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-agent
+
+hq-fuel-agent: taxi.o fueltaxi.o state.o atom.o h-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o fueltaxi.o state.o atom.o h-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-fuel-agent
+
+hq-delta-agent: taxi.o delta-taxi.o state.o atom.o h-delta-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o h-delta-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-delta-agent
+
+ma-file: ma-file.o ma.o 
+	$(CC) $(CFLAGS) $(LIBS) ma-file.o ma.o -o ma-file
+
+#
+# modules
+#
+
+atom.o: atom.c atom.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c atom.c
+
+delta-taxi.o: delta-taxi.c delta-taxi.h taxi.h atom.h state.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c delta-taxi.c
+
+flat-maxq.o: flat-maxq.c predicate.h taxi.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c flat-maxq.c
+
+flat-fuel-maxq.o: flat-fuel-maxq.c predicate.h taxi.h fueltaxi.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c flat-fuel-maxq.c
+
+fueltaxi.o: fueltaxi.h fueltaxi.c taxi.h state.h atom.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c fueltaxi.c
+
+getopt.o: getopt.c 
+	$(CC) -c getopt.c
+
+h-maxq.o: h-maxq.c predicate.h taxi.h atom.h state.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-maxq.c
+
+h-fuel-maxq.o: h-fuel-maxq.c predicate.h taxi.h fueltaxi.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-fuel-maxq.c
+
+h-delta-maxq.o: h-delta-maxq.c predicate.h taxi.h delta-taxi.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-delta-maxq.c
+
+hps.o: hps.c psweep.h global.h state.h get-state.h hq.h parameter.h hq-features.h hq-parameters.h lib/list.h lib/table.h lib/clrandom.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c hps.c -o hps.o
+
+hq.o: global.h point.h taxi-maxq.h hq.h  ma.h parameter.h hq-features.h snet.h hq-parameters.h  hq.c point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c hq.c
+
+hq-agent.o: taxi.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DTAXISTATE -c hq-agent.c -o hq-agent.o
+
+hq-fuel-agent.o: taxi.h fueltaxi.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DFUELTAXISTATE -c hq-agent.c -o hq-fuel-agent.o
+
+hq-delta-agent.o: taxi.h delta-taxi.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DDELTATAXISTATE -c hq-agent.c -o hq-delta-agent.o
+
+hq-features.o: hq-features.h hq-features.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c hq-features.c
+
+hq-parameters.o: hq-parameters.h hq-parameters.c 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c hq-parameters.c
+
+ma.o: lib/vector.h ma.c ma.h
+	$(CC) $(CFLAGS) -c ma.c
+
+ma-file.o: lib/vector.h ma-file.c ma.h
+	$(CC) $(CFLAGS) -c ma-file.c
+
+net.o: net.h net.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c net.c
+
+parameter.o: parameter.h parameter.c 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c parameter.c
+
+point.o: point.h point.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c point.c
+
+predicate.o: predicate.h predicate.c state.h get-state.h parameter.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c predicate.c
+
+psweep.o: psweep.h hq.h get-state.h parameter.h predicate.h snet.h hq-parameters.h ma.h psweep.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c psweep.c -o psweep.o
+
+snet.o: snet.h net.h snet.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c snet.c
+
+state.o: state.h state.c atom.h parameter.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c state.c
+
+taxi.o: taxi.h taxi.c global.h point.h state.h atom.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c taxi.c
+
+clean:
+	$(RM) *.o ptrepository/*
+         
+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d6 3
+a8 1
+# State Type:
+a9 1
+STATEFLAG = -DFUELTAXISTATE
+a10 1
+# Common Macros
+a12 32
+# Unix Macros
+# comment out the appropriate macros for your computer and operating system.
+# shared unix macros
+#RM     = rm -fr
+#GETOPT = getopt.o
+
+# on suns
+#CC     = g++
+#CC = CC
+#CFLAGS = -O2 -g -I$(ILIB) $(STATEFLAG)
+#PURIFY = purify 
+
+# for Solaris:
+#LIBS = -lc -lm 
+#OSTYPE = SOLARIS
+
+# for Sunos:
+# LIBS = -lc -lm
+# OSTYPE = SUNOS
+
+# on hp
+#CC     = CC
+#CFLAGS = -g -I $(ILIB) -I /usr/include/X11R5  $(STATEFLAG)
+#PURIFY =
+#LIBS = -lc -lm
+
+# Borland C++ Macros
+#CC     = bcc
+#CFLAGS = -I$(ILIB) -P -N -D__GNUG__  $(STATEFLAG)
+
+# Cygnus g++ on WINDOWS98
+# hopefully this also works under linux
+a13 1
+#CFLAGS = -g -I$(ILIB)   $(STATEFLAG)
+d15 1
+a15 1
+#CFLAGS = -O2 -I$(ILIB)  $(STATEFLAG)
+d28 2
+a29 45
+cumsum: cumsum.o 
+	$(CC) $(CFLAGS) $(LIBS) cumsum.o -o cumsum
+
+decimate: decimate.c
+	$(CC) $(CFLAGS) $(LIBS) decimate.c -o decimate
+
+extract: extract.o 
+	$(CC) $(CFLAGS) $(LIBS) extract.o -o extract
+
+extract2: extract2.o 
+	$(CC) $(CFLAGS) $(LIBS) extract2.o -o extract2
+
+exceed: exceed.c
+	$(CC) $(CFLAGS) exceed.c -o exceed
+
+random-agent: random-agent.o taxi.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o lib/list.h
+	$(CC) $(CFLAGS) random-agent.o taxi.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o random-agent
+
+key-agent: key-agent.o taxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o 
+	$(CC) $(CFLAGS) key-agent.o taxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o key-agent
+
+key-fuel-agent: key-fuel-agent.o fueltaxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o lib/list.h taxi.o
+	$(CC) $(CFLAGS) key-fuel-agent.o fueltaxi.o taxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o key-fuel-agent
+
+key-delta-agent: key-delta-agent.o taxi.o delta-taxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o 
+	$(CC) $(CFLAGS) key-delta-agent.o taxi.o delta-taxi.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o key-delta-agent
+
+key-parr-agent: key-parr-agent.o parr.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o 
+	$(CC) $(CFLAGS) key-parr-agent.o parr.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o key-parr-agent
+
+key-ryan-agent: key-ryan-agent.o ryan.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o 
+	$(CC) $(CFLAGS) key-ryan-agent.o ryan.o state.o point.o atom.o parameter.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o key-ryan-agent
+
+fq-parr-agent: parr.o state.o atom.o flat-parr-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o parr-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) parr.o state.o atom.o flat-parr-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o parr-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-parr-agent
+
+
+fq-agent: taxi.o state.o atom.o flat-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o state.o atom.o flat-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-agent
+
+fq-fuel-agent: taxi.o fueltaxi.o state.o atom.o flat-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o fueltaxi.o state.o atom.o flat-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-fuel-agent
+
+fq-delta-agent: taxi.o delta-taxi.o state.o atom.o flat-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o flat-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-delta-agent
+d31 2
+a32 2
+fq-hdg-agent: hdg.o state.o atom.o flat-hdg-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) hdg.o state.o atom.o flat-hdg-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o fq-hdg-agent
+d34 2
+a35 2
+hq-hdg-agent: hdg.o state.o atom.o h-hdg-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) hdg.o state.o atom.o h-hdg-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-hdg-agent
+d37 2
+a38 2
+hq-hdg-agent2: hdg.o state.o atom.o h-hdg-maxq2.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) hdg.o state.o atom.o h-hdg-maxq2.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-hdg-agent2
+d40 2
+a41 2
+hq-hdg-nabs-agent: hdg.o state.o atom.o h-hdg-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) hdg.o state.o atom.o h-hdg-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-hdg-nabs-agent
+d43 2
+a44 20
+hq-hdg-approx-agent: hdg.o state.o atom.o h-hdg-approx-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) hdg.o state.o atom.o h-hdg-approx-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hdg-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-hdg-approx-agent
+
+hq-agent: taxi.o state.o atom.o h-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o state.o atom.o h-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-agent
+
+hq-fuel-agent: taxi.o fueltaxi.o state.o atom.o h-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o fueltaxi.o state.o atom.o h-fuel-maxq.o hq.o hps.o psweep.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-fuel-agent
+
+hq-delta-agent: taxi.o delta-taxi.o state.o atom.o h-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o h-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-delta-agent
+
+hq-fuel-nabs-agent: taxi.o fueltaxi.o state.o atom.o h-fuel-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o fueltaxi.o state.o atom.o h-fuel-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-fuel-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-fuel-nabs-agent
+
+hq-nabs-agent: taxi.o state.o atom.o h-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o state.o atom.o h-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-nabs-agent
+
+hq-nabs-delta-agent: taxi.o delta-taxi.o state.o atom.o h-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o h-nabs-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o hq-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-nabs-delta-agent
+a48 41
+mean: mean.o 
+	$(CC) $(CFLAGS) $(LIBS) mean.o -o mean
+
+poll-delta-agent: taxi.o delta-taxi.o state.o atom.o h-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o poll-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o
+	$(CC) $(CFLAGS) taxi.o delta-taxi.o state.o atom.o h-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o poll-delta-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(LIBS) -o poll-delta-agent
+
+hq-parr-agent: parr.o state.o atom.o h-parr-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o h-parr-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) parr.o state.o atom.o h-parr-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o h-parr-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o hq-parr-agent
+
+scale: scale.o 
+	$(CC) $(CFLAGS) $(LIBS) scale.o -o scale
+
+running-t-test: running-t-test.o ma.o 
+	$(CC) $(CFLAGS) running-t-test.o ma.o $(LIBS) -o running-t-test
+
+ryan-agent: ryan.o state.o atom.o ryan-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o ryan-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT)
+	$(CC) $(CFLAGS) ryan.o state.o atom.o ryan-maxq.o hq.o lib/clstring.o parameter.o predicate.o hq-features.o snet.o net.o ryan-agent.o lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o hq-parameters.o point.o ma.o $(GETOPT) $(LIBS) -o ryan-agent
+
+mean-curve: mean-curve.c
+	$(CC) $(CFLAGS) $(LIBS) mean-curve.c -o mean-curve
+
+double-mean-curve: double-mean-curve.c
+	$(CC) $(CFLAGS) $(LIBS) double-mean-curve.c -o double-mean-curve
+
+mean-xy-curve: mean-xy-curve.c
+	$(CC) $(CFLAGS) $(LIBS) mean-xy-curve.c -o mean-xy-curve
+
+weighted-mean-curve: weighted-mean-curve.c
+	$(CC) $(CFLAGS) $(LIBS) weighted-mean-curve.c -o weighted-mean-curve
+
+compare-weights: compare-weights.c
+	$(CC) $(CFLAGS) $(LIBS) compare-weights.c -o compare-weights
+
+test: test.c lib/clrandom.o 
+	$(CC) $(CFLAGS) $(LIBS) test.c lib/clrandom.o  -o test
+
+test-gnu-random: test-gnu-random.c lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o
+	$(CC) $(CFLAGS) $(LIBS) test-gnu-random.c lib/clrandom.o lib/gnu-mlcg.o lib/gnu-rng.o -o test-gnu-random
+
+wts-diff: wts-diff.c lib/clstring.o
+	$(CC) $(CFLAGS) $(LIBS) wts-diff.c lib/clstring.o -o wts-diff
+a55 4
+cumsum.o: cumsum.c
+	$(CC) $(CFLAGS) -c cumsum.c
+
+
+a58 6
+extract.o: extract.c
+	$(CC) $(CFLAGS) -c extract.c
+
+extract2.o: extract2.c
+	$(CC) $(CFLAGS) -c extract2.c
+
+a64 3
+flat-hdg-maxq.o: flat-hdg-maxq.c predicate.h hdg.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c flat-hdg-maxq.c
+
+a70 12
+h-hdg-approx-maxq.o: h-hdg-approx-maxq.c predicate.h hdg.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-hdg-approx-maxq.c
+
+h-hdg-maxq.o: h-hdg-maxq.c predicate.h hdg.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-hdg-maxq.c
+
+h-hdg-maxq2.o: h-hdg-maxq2.c predicate.h hdg.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-hdg-maxq2.c
+
+h-hdg-nabs-maxq.o: h-hdg-nabs-maxq.c predicate.h hdg.h parameter.h hq-features.h hq.h ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-hdg-nabs-maxq.c
+
+d77 2
+a78 11
+h-fuel-nabs-maxq.o: h-fuel-nabs-maxq.c predicate.h taxi.h fueltaxi.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-fuel-nabs-maxq.c
+
+h-nabs-maxq.o: h-nabs-maxq.c predicate.h taxi.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-nabs-maxq.c
+
+hdg.o: hdg.h hdg.c taxi.h state.h atom.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c hdg.c
+
+hdg-agent.o: hdg.h hq.h  ma.h parameter.h hq-parameters.h  hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DHDGSTATE -c hq-agent.c -o hdg-agent.o
+a100 16
+# different defines use different environments
+key-agent.o: key-agent.c atom.h state.h taxi.h parameter.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DTAXISTATE -c key-agent.c -o key-agent.o
+
+key-fuel-agent.o: key-agent.c atom.h state.h taxi.h parameter.h fueltaxi.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DFUELTAXISTATE -c key-agent.c -o key-fuel-agent.o
+
+key-delta-agent.o: key-agent.c atom.h state.h taxi.h parameter.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DDELTATAXISTATE -c key-agent.c -o key-delta-agent.o
+
+key-parr-agent.o: key-agent.c atom.h state.h taxi.h parameter.h parr.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DPARRSTATE -c key-agent.c -o key-parr-agent.o
+
+key-ryan-agent.o: key-agent.c atom.h state.h taxi.h parameter.h ryan.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DRYANSTATE -c key-agent.c -o key-ryan-agent.o
+
+a106 3
+mean.o: mean.c
+	$(CC) $(CFLAGS) -c mean.c
+
+a112 16
+h-parr-agent.o: parr.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DPARRSTATE -DHPARRSTATE -c hq-agent.c -o h-parr-agent.o
+
+parr-agent.o: parr.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DPARRSTATE -c hq-agent.c -o parr-agent.o
+
+
+h-parr-maxq.o: h-parr-maxq.c predicate.h parr.h atom.h state.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c h-parr-maxq.c
+
+parr.o: parr.h parr.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c parr.c
+
+taxi-predicate.o: parameter.h taxi.h predicate.h predicate.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DTAXISTATE -c predicate.c -o taxi-predicate.o
+
+d116 2
+a117 2
+poll-delta-agent.o: taxi.h delta-taxi.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h poll-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DDELTATAXISTATE -c poll-agent.c -o poll-delta-agent.o
+a121 18
+scale.o: scale.c
+	$(CC) $(CFLAGS) -c scale.c
+
+random-agent.o: random-agent.c
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c random-agent.c
+
+running-t-test.o: running-t-test.c ma.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c running-t-test.c -o running-t-test.o
+
+ryan.o: ryan.c ryan.h atom.h state.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c ryan.c
+
+ryan-agent.o: ryan.h hq.h  ma.h parameter.h hq-parameters.h taxi-maxq.h hq-agent.c point.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -DRYANSTATE -c hq-agent.c -o ryan-agent.o
+
+ryan-maxq.o: ryan-maxq.c predicate.h ryan.h atom.h state.h parameter.h hq-features.h hq.h  ma.h global.h point.h
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c ryan-maxq.c
+
+a130 3
+taxi-maxq.o: taxi-maxq.c taxi.h parameter.h predicate.h snet.h hq-parameters.h 
+	$(CC) $(CFLAGS) -D$(OSTYPE) -c taxi-maxq.c
+
+a133 3
+
+ryan-distribution:
+	tar cvf ryan.tar Makefile atom.c atom.h flat-fuel-maxq.c fueltaxi.c fueltaxi.h global.h h-fuel-maxq.c h-maxq.c hq-agent.c hq-features.c hq-features.h hq-parameters.c hq-parameters.h hq-table.c hq-table.h hq.c hq.h key-agent.c ma.h ma-file.c net.c net.h parameter.c parameter.h point.c point.h predicate.c predicate.h ryan-maxq.c ryan-tree-2.fig ryan-tree-2.eps ryan.c ryan.h snet.c snet.h state.c state.h taxi.c taxi.h taxi-maxq.h lib/*.c lib/*.C lib/*.h lib/Makefile RYAN-README q-1.0-.000.con 
+@

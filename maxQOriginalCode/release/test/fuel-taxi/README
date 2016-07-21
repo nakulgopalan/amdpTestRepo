@@ -1,0 +1,24 @@
+Experiments with the Fuel Taxi
+
+The fuel taxi MDP is very slow to converge for flat Q learning.  I
+found that epsilon-greedy exploration worked best in this domain.
+Load plot.gp into gnuplot to see a comparison of the methods.
+
+
+flat-q.con        train flat q learning
+flat-q.script
+
+   I have retained three sub-ma-200 files for three different
+   rates of cooling the epsilon-greedy exploration.  Fast cooling
+   leads to an earlier rise in performance, but ultimately poorer
+   performance.  
+
+h-q.con           train hierarchical q learning
+h-q.script      
+
+To rerun the experiments, first go to the release directory and
+make fq-fuel-agent and hq-fuel-agent.  Move those executables to this
+directory and then run flat-q.script and/or h-q.script.
+
+flat-hand-coded.script evaluates the hand-coded policy. 
+

@@ -1,0 +1,56 @@
+//  hand-coded parameter file
+283487          // random number seed for agent
+
+///////////learning rate controls///////////////
+0              // prioritized sweeping
+1.0            // learning rate: 
+// list of (trial maxnode lrate) to change learning rates
+( )
+5              // psweep steps per action
+
+///////////exploration controls//////////////////
+1               // 0=> Boltzmann exploration 1=> epsilonGreedy exploration 2=> counters
+1.0             // initial temperature or (initial epsilon) or number
+                // of visits for counter-based exploration
+0.001           // cooling rate (or amount to decrease epsilon)
+0               // minimum temperature (or min epsilon)
+// list of (nodename initial-temp coolingrate mintemp)
+(MaxNavigate 1.0 0.002 0.0
+ MaxRoot     1.0 0.00005 0.0
+)
+// list of max nodes to require policy
+( )  
+
+///////////////other stuff//////////////////////
+1.0             // discount factor
+0.0             // hand-coded policy probability
+0               // VERBOSE
+0               // LEARNVERBOSE
+1000            // maxStepsPerEvalTrial
+1000            // stepsPerEvalCall.  Set to 1 for hierarchical greedy
+                //      execution
+// list of max nodes to monitor in log file
+( )
+// list of max nodes on which to perform value iteration
+( )
+
+///////////////selective learning controls//////////
+// I'm not currently using these, so I've set them to always update
+// and cool
+100             // ABEspan
+9999.0          // deltaBellmanThreshold (max tildeBellmanError per
+                // step for a max node in order to cool)
+9999.0          // update Threshold (max moving average
+                // tildeBellmanError of child in order to learn)
+
+/////////////methods for introducing hierarchical greedy execution////
+0.0             // interrupt probability
+99999           // pollingCoolingRate; reduce RootQuota every N trials
+0               // pollingCoolingStep; amount to reduce RootQuota
+                // in ValueIteration = number of times to execute each
+                // action during value measurement.
+5000            // maxStepsPerTrial
+
+////////////unsupported controls/////////////////////
+0               // discriminate (not supported)
+0.0             // lambda (not supported)

@@ -1,0 +1,40 @@
+Experiments with the delta-taxi.  This is a version of the taxi
+problem in which actions are noisy and the passenger can change the
+destination one move after the pickup action. 
+
+flat-hand-coded.script     Execute flat hand-coded policy
+flat-hand-coded.con        Associated parameter file
+        When this script completes, the last line of the file
+        flat-hand-coded.mean gives the mean reward per trial over 5000
+        trials. 
+
+flat-q.script              Train with flat Q learning
+flat-q.con
+
+h-hand-coded.script        Execute hierarchical hand-coded policy
+                           I believe this will be recursively optimal.
+
+h-hand-coded.con
+
+h-q.script                 Train hierarchical Q learning
+h-q.con                    Associated parameter file.  Note that
+                           significant effort has gone in to
+                           determining separate exploration cooling
+                           schedules for each subtask.
+
+h-q-polling.script         Traing hierarchical Q learning with polling
+                           execution.
+h-q-polling.con
+
+plot.gp                    Load this into gnuplot to plot performance.
+                           
+
+To reproduce these runs, go to the release directory and do a clean
+make of fq-delta-agent and hq-delta-agent.  Move the executables here
+and execute each of the script files.
+
+Note that the script files will clobber the sub-ma-200 output files,
+so to do a comparison, you should first rename these files.
+
+
+

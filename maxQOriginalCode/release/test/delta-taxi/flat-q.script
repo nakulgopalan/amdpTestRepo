@@ -1,0 +1,3 @@
+# /bin/csh
+./fq-delta-agent -b -t 10000 -c flat-q.con > flat-q.log
+../data.script flat-q

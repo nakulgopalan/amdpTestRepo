@@ -1,0 +1,59 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@ * @;
+
+
+1.1
+date	2002.04.25.14.54.48;	author tgd;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@//  -*- C++ -*-
+//
+// Table-based value functions for HQ learning
+//
+//
+#include "parameter.h"
+#include "hq-features.h"
+#include <list.h>
+#include <vector.h>
+
+float & lookup(vector<float> * table, vector<float> * fv, list<ParameterName> * features)
+{
+  int index = 0;
+  vectorIterator<float> fvItr(*fv);
+  fvItr.init();
+  if (!fvItr) {
+    index += (int) fvItr();
+    ++fvItr;
+    if (features) {
+      listIterator<ParameterName> itr(*features);
+      for(itr.init(); !itr; ++itr) {
+	if (!fvItr) {
+	  index *= featureSize(itr());
+	  index += (int) fvItr();
+	  ++fvItr;
+	}
+	else break;
+      }
+    }
+  }
+  return (*table)[index];
+}
+      
+    
+    
+  
+@
